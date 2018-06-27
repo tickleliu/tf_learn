@@ -44,40 +44,59 @@ def main(_):
     yp = tf.placeholder(dtype=tf.float32, shape=[None, 1])
     lp = tf.placeholder(dtype=tf.int32, shape=[None])
 
-    lstm_cell = rnn.BasicLSTMCell(num_units=FLAGS.hidden_num, forget_bias=1.0,
-                                  activation=tf.nn.tanh, state_is_tuple=True)
-    lstm_cell = rnn.DropoutWrapper(cell=lstm_cell, input_keep_prob=1.0, output_keep_prob=0.7)
+    for i in range(2):
+        with tf.variable_scope(None, default_name="bidirectional-rnn"):
+            if i == 0:
+                input = xp
+            # print(tf.shape(input))
+            # input = tf.Print(input, [tf.shape(input)])
+            fw_lstm_cell = rnn.BasicLSTMCell(num_units=FLAGS.hidden_num, forget_bias=1.0,
+                                             activation=tf.nn.tanh, state_is_tuple=True)
+            fw_lstm_cell = rnn.DropoutWrapper(cell=fw_lstm_cell, input_keep_prob=1.0, output_keep_prob=0.7)
 
-    layers = [rnn.DropoutWrapper(cell=rnn.BasicLSTMCell(num_units=FLAGS.hidden_num, forget_bias=1.0,
-                                                        activation=tf.nn.tanh, state_is_tuple=True),
-                                 input_keep_prob=1.0, output_keep_prob=0.7) for _ in range(2)]
-    # print(layers)
-    # print([lstm_cell] * 4)
+            bw_lstm_cell = rnn.BasicLSTMCell(num_units=FLAGS.hidden_num, forget_bias=1.0,
+                                             activation=tf.nn.tanh, state_is_tuple=True)
+            bw_lstm_cell = rnn.DropoutWrapper(cell=bw_lstm_cell, input_keep_prob=1.0, output_keep_prob=0.7)
+            fw_init_state = fw_lstm_cell.zero_state(FLAGS.batch_size, dtype=tf.float32)
+            bw_init_state = bw_lstm_cell.zero_state(FLAGS.batch_size, dtype=tf.float32)
 
-    mlstm_cell = tf.nn.rnn_cell.MultiRNNCell(layers, state_is_tuple=True)
-    init_state = mlstm_cell.zero_state(FLAGS.batch_size, dtype=tf.float32)
-    # init_state = lstm_cell.zero_state(FLAGS.batch_size, dtype=tf.float32)
-    # (outputs, state) = tf.nn.dynamic_rnn(lstm_cell, inputs=xp, initial_state=init_state, dtype=tf.float32,
-    #                                      time_major=False,
-    #                                      sequence_length=lp)
-    (outputs, state) = tf.nn.dynamic_rnn(mlstm_cell, inputs=xp, initial_state=init_state, dtype=tf.float32,
-                                         # time_major=False,
-                                         sequence_length=lp)
+            # print(layers)
+            # print([lstm_cell] * 4)
+
+            # init_state = lstm_cell.zero_state(FLAGS.batch_size, dtype=tf.float32)
+            # (outputs, state) = tf.nn.dynamic_rnn(lstm_cell, inputs=xp, initial_state=init_state, dtype=tf.float32,
+            #                                      time_major=False,
+            #                                      sequence_length=lp)
+            (outputs, state) = tf.nn.bidirectional_dynamic_rnn(fw_lstm_cell, bw_lstm_cell, inputs=input,
+                                                               initial_state_fw=fw_init_state,
+                                                               initial_state_bw=bw_init_state,
+                                                               dtype=tf.float32,
+                                                               sequence_length=lp)
+            input = tf.concat(outputs, 2)
+    outputs = input
     # outputs = tf.Print(outputs, [tf.shape(outputs), outputs[:, 0, :], outputs[:, 1, :], outputs[:, 2:, :]],
     #                    "before slice")
+    # output1 = outputs[:, -1, :]
+    # output2 = outputs[:, -2, :]
+    # outputs = tf.concat(outputs[:, -2:-1, :], 1)
     outputs = outputs[:, -1, :]
     # outputs = tf.Print(outputs, [outputs], "after slice")
 
-    w = tf.Variable(initial_value=tf.truncated_normal(shape=[FLAGS.hidden_num, 1]), dtype=tf.float32)
+    # outputs = tf.transpose(outputs[0, 2, 1])
+    w = tf.Variable(initial_value=tf.truncated_normal(shape=[FLAGS.hidden_num * 2, 1]), dtype=tf.float32)
     b = tf.Variable(initial_value=tf.truncated_normal(shape=[1, 1]), dtype=tf.float32)
 
-    out = tf.matmul(outputs, w) + b
+    out = tf.matmul(outputs, w)
+    out = out + b
 
-    loss = tf.reduce_mean(tf.reduce_sum(tf.square(out - yp)))
+    tv = tf.trainable_variables()
+    regularization_cost = 0.001 * tf.reduce_sum([tf.nn.l2_loss(v) for v in tv])
+    loss = tf.reduce_mean(tf.reduce_sum(tf.square(out - yp))) + regularization_cost
     # train_op = tf.train.GradientDescentOptimizer(learning_rate=0.001).minimize(loss)
     global_step = tf.Variable(0, trainable=False)
     add_global = global_step.assign_add(1)
-    learning_rate = tf.train.exponential_decay(learning_rate=0.01, global_step=global_step, decay_rate=0.9, decay_steps=10)
+    learning_rate = tf.train.exponential_decay(learning_rate=0.01, global_step=global_step, decay_rate=0.9,
+                                               decay_steps=10)
     op = tf.train.AdamOptimizer(learning_rate=learning_rate)
     grads_and_vars = op.compute_gradients(loss)
     grads_and_vars = [(gv[0] / 2, gv[1]) for gv in grads_and_vars]
