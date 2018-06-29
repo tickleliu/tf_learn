@@ -86,7 +86,7 @@ def main(_):
 
     with tf.Session() as sess:
         sess.run(tf.initialize_all_variables())
-        for i in range(20000):
+        for i in range(20):
             ids = np.arange(x.shape[0])
             np.random.shuffle(ids)
             ids = ids[0:FLAGS.batch_size]
@@ -95,6 +95,11 @@ def main(_):
             # def dynamic_rnn(cell, inputs, sequence_length=None, initial_state=None,
             #                 dtype=None, parallel_iterations=None, swap_memory=False,
             #                 time_major=False, scope=None):
+        print(tf.local_variables())
+        print(tf.global_variables())
+        print(tf.trainable_variables())
+        print(tf.model_variables())
+
 
 
 if __name__ == "__main__":

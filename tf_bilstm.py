@@ -92,6 +92,9 @@ def main(_):
     tv = tf.trainable_variables()
     regularization_cost = 0.001 * tf.reduce_sum([tf.nn.l2_loss(v) for v in tv])
     loss = tf.reduce_mean(tf.reduce_sum(tf.square(out - yp))) + regularization_cost
+
+    tf.summary.scalar("loss", loss)
+    merged_summary = tf.summary.merge_all()
     # train_op = tf.train.GradientDescentOptimizer(learning_rate=0.001).minimize(loss)
     global_step = tf.Variable(0, trainable=False)
     add_global = global_step.assign_add(1)
@@ -105,12 +108,15 @@ def main(_):
 
     with tf.Session() as sess:
         sess.run(tf.initialize_all_variables())
+        writer = tf.summary.FileWriter("./", sess.graph)
         for i in range(20000):
             ids = np.arange(x.shape[0])
             np.random.shuffle(ids)
             ids = ids[0:FLAGS.batch_size]
-            _, loss_value = sess.run([train_op, loss], feed_dict={xp: x[ids], yp: y[ids], lp: l[ids].flatten()})
+            _, loss_value, summary = sess.run([train_op, loss, merged_summary],
+                                              feed_dict={xp: x[ids], yp: y[ids], lp: l[ids].flatten()})
             print("迭代次数 %s, 训练误差 %s" % (i, loss_value))
+            writer.add_summary(summary, i)
             # def dynamic_rnn(cell, inputs, sequence_length=None, initial_state=None,
             #                 dtype=None, parallel_iterations=None, swap_memory=False,
             #                 time_major=False, scope=None):
