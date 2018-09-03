@@ -73,6 +73,9 @@ def main(_):
             for i in range(2):
                 tf_viterbi_sequence, _, _ = session.run([viterbi_sequence, train_op, loss])
                 if i % 100 == 0:
+                    print(mask)
+                    print(sequence_lengths)
+                    print(np.expand_dims(np.arange(num_words), axis=0))
                     correct_labels = np.sum((y == tf_viterbi_sequence) * mask)
                     accuracy = 100.0 * correct_labels / float(total_labels)
                     print("Accuracy: %.2f%%" % accuracy)

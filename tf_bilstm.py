@@ -13,10 +13,10 @@ import os
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # 使用 GPU 0，1
 
 FLAGS = tf.app.flags.FLAGS
-tf.app.flags.DEFINE_float("batch_size", 2, "iteration batch size")
-tf.app.flags.DEFINE_float("time_step", 3, "lstm time step")
+tf.app.flags.DEFINE_float("batch_size", 1, "iteration batch size")
+tf.app.flags.DEFINE_float("time_step", 4, "lstm time step")
 tf.app.flags.DEFINE_float("embedding_size", 1, "embedding size")
-tf.app.flags.DEFINE_integer("hidden_num", 2, "lstm hidden unit number")
+tf.app.flags.DEFINE_integer("hidden_num", 1, "lstm hidden unit number")
 
 
 def main(_):
@@ -32,7 +32,7 @@ def main(_):
     n = np.random.randn(10000, 1) / 1000
     y = x[:, -1]
     # y = y + n
-    l = np.ones(shape=[10000, 1], dtype=np.int32) * 10
+    l = np.ones(shape=[10000, 1], dtype=np.int32) * 2
 
     # model
 
@@ -72,17 +72,20 @@ def main(_):
                                                                initial_state_bw=bw_init_state,
                                                                dtype=tf.float32,
                                                                sequence_length=lp)
-            input = tf.concat(outputs, 2)
-    outputs = input
-    # outputs = tf.Print(outputs, [tf.shape(outputs), outputs[:, 0, :], outputs[:, 1, :], outputs[:, 2:, :]],
-    #                    "before slice")
-    # output1 = outputs[:, -1, :]
-    # output2 = outputs[:, -2, :]
-    # outputs = tf.concat(outputs[:, -2:-1, :], 1)
-    outputs = outputs[:, -1, :]
-    # outputs = tf.Print(outputs, [outputs], "after slice")
 
-    # outputs = tf.transpose(outputs[0, 2, 1])
+            input = tf.concat(outputs, 2)
+    outputs = tf.Print(input, [outputs], summarize=1000)
+    # outputs = tf.Print(outputs, [input], summarize=1000)
+    # outputs = tf.Print(outputs, [state], summarize=1000)
+
+    batch_size = tf.shape(outputs)[0]
+    max_length = tf.shape(outputs)[1]
+    out_size = int(outputs.get_shape()[2])
+    index = tf.range(0, batch_size) * max_length
+    index = index + (lp - 1)
+    flat = tf.reshape(outputs, [-1, out_size])
+    outputs = tf.gather(flat, index)
+
     w = tf.Variable(initial_value=tf.truncated_normal(shape=[FLAGS.hidden_num * 2, 1]), dtype=tf.float32)
     b = tf.Variable(initial_value=tf.truncated_normal(shape=[1, 1]), dtype=tf.float32)
 
