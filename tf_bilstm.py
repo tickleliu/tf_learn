@@ -72,7 +72,6 @@ def main(_):
                                                                initial_state_bw=bw_init_state,
                                                                dtype=tf.float32,
                                                                sequence_length=lp)
-
             input = tf.concat(outputs, 2)
     outputs = tf.Print(input, [outputs], summarize=1000)
     # outputs = tf.Print(outputs, [input], summarize=1000)
